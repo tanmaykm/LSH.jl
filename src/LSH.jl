@@ -4,6 +4,11 @@ using Primes
 using SparseArrays
 using Statistics
 
+import Base: match
+
+export LSHModel
+export match, signature
+
 const DEFAULT_THRESHOLD = 0.75
 
 struct LSHModel
@@ -174,19 +179,23 @@ function signature(model::LSHModel, tm::SparseMatrixCSC{Int,Int})
 end
 
 function selftest(model::LSHModel)
+    @info("running selftest...")
     ndocs,nhashes = size(model.dochashes)
+    nfailures = 0
     for d in 1:ndocs
         sig = model.dochashes[d,:]
         matches = match(model, sig)
-        (d in [x.id for x in matches]) || @warn("docid did not match", docid=d)
+        (d in [x.id for x in matches]) || (nfailures += 1; @warn("docid did not match", docid=d))
         
         if (length(matches) > 1) && (d != first(matches).id)
             # check if there are multiple matches with same score
             topscore = first(matches).similarity
             docscore = matches[findfirst(x->x.id == d, matches)].similarity
-            (docscore == topscore) || @warn("doc not best batch for its own signature", docid=d, matches=matches)
+            (docscore == topscore) || (nfailures += 1; @warn("doc not best batch for its own signature", docid=d, matches=matches))
         end
-   end
+    end
+    @info("selftest done", nfailures)
+    nfailures
 end
 
 end # module LSH
