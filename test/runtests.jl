@@ -7,5 +7,10 @@ using SparseArrays
 # BSD-1-Clause.txt, GPL-1.0-only.txt, LGPL-2.0-only.txt, MIT.txt, Vim.txt
 dtm = sparse(convert(Array{Int64,2}, readdlm("testinput.csv", ',')))
 model = LSHModel(20, dtm)
+
+@info("testing signatures...")
+signatures = signature(model, dtm)
+@test signatures == model.dochashes
+
 nfailures = LSH.selftest(model)
 @test nfailures == 0
