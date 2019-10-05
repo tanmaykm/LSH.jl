@@ -1,5 +1,9 @@
 name = "LSH"
 uuid = "9a8dc858-87cd-50d4-8b18-f2d562f3e4f5"
+keywords = ["LSH", "locality", "sensitive", "hashing", "weighted", "minhash"]
+license = "MIT"
+desc = "Locality Sensitive Hashing in Julia"
+version = "0.1.0"
 
 [deps]
 Primes = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
