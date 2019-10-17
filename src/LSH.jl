@@ -4,7 +4,7 @@ using Primes
 using SparseArrays
 using Statistics
 
-import Base: match
+import Base: match, show
 
 export LSHModel
 export match, signature
@@ -34,6 +34,12 @@ function LSHModel(nhashes::Integer, dtm::SparseMatrixCSC{T,T}) where {T <: Integ
     dochash!(dochashes, termhashes, dtm)
 
     LSHModel{T}(A, B, c, termhashes, dochashes, Dict{Float64,Any}())
+end
+
+function show(io::IO, model::LSHModel{T}) where T
+    nterms,nhashes = size(model.termhashes)
+    ndocs,_ = size(model.dochashes)
+    print(io, "LSHModel{$T}(nhashes=$nhashes, ndocs=$ndocs, nterms=$nterms)")
 end
 
 # Weighted Minhash

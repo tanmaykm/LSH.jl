@@ -10,6 +10,9 @@ function test_typed(T)
     # BSD-1-Clause.txt, GPL-1.0-only.txt, LGPL-2.0-only.txt, MIT.txt, Vim.txt
     dtm = convert(SparseMatrixCSC{T,T}, sparse(convert(Array{T,2}, readdlm("testinput.csv", ','))))
     model = LSHModel(20, dtm)
+    iob = IOBuffer()
+    show(iob, model)
+    @test String(take!(iob)) == "LSHModel{$T}(nhashes=20, ndocs=5, nterms=9554)"
 
     @info("testing signatures...")
     signatures = signature(model, dtm)
