@@ -4,62 +4,68 @@ using Primes
 using SparseArrays
 using Statistics
 
-import Base: match
+import Base: match, show
 
 export LSHModel
 export match, signature
 
 const DEFAULT_THRESHOLD = 0.75
 
-struct LSHModel
-    A::Vector{Int}
-    B::Vector{Int}
-    c::Int
-    termhashes::Array{Int,2}
-    dochashes::Array{Int,2}
+struct LSHModel{T <: Integer}
+    A::Vector{T}
+    B::Vector{T}
+    c::T
+    termhashes::Array{T,2}
+    dochashes::Array{T,2}
     bandhash::Dict{Float64,Any}
+end
 
-    function LSHModel(nhashes::Int, dtm::SparseMatrixCSC{Int,Int})
-        ndocs,nterms = size(dtm)
-        c = nextprime(nterms)
-        A = rand(1:c, nhashes)
-        B = rand(1:c, nhashes)
+function LSHModel(nhashes::Integer, dtm::SparseMatrixCSC{T,T}) where {T <: Integer}
+    ndocs,nterms = size(dtm)
+    c = T(nextprime(nterms))
+    A = rand(T(1):T(c), nhashes)
+    B = rand(T(1):T(c), nhashes)
 
-        termhashes = Array{Int,2}(undef,nterms,nhashes)
-        dochashes = Array{Int,2}(undef,ndocs,nhashes)
+    termhashes = Array{T,2}(undef,nterms,nhashes)
+    dochashes = Array{T,2}(undef,ndocs,nhashes)
 
-        termhash!(termhashes, A, B, c)
-        apply_term_weights!(termhashes, dtm)
-        dochash!(dochashes, termhashes, dtm)
+    termhash!(termhashes, A, B, c)
+    apply_term_weights!(termhashes, dtm)
+    dochash!(dochashes, termhashes, dtm)
 
-        new(A, B, c, termhashes, dochashes, Dict{Float64,Any}())
-    end
+    LSHModel{T}(A, B, c, termhashes, dochashes, Dict{Float64,Any}())
+end
+
+function show(io::IO, model::LSHModel{T}) where T
+    nterms,nhashes = size(model.termhashes)
+    ndocs,_ = size(model.dochashes)
+    print(io, "LSHModel{$T}(nhashes=$nhashes, ndocs=$ndocs, nterms=$nterms)")
 end
 
 # Weighted Minhash
-function termhash!(termhashes::Array{Int,2}, A::Vector{Int}, B::Vector{Int}, c::Int)
+function termhash!(termhashes::Array{T,2}, A::Vector{T}, B::Vector{T}, c::T) where {T <: Integer}
     @info("generating term hashes...")
     nterms,nhashes = size(termhashes)
     terms = 1:nterms
     for h in 1:nhashes
         a = A[h]
         b = B[h]
-        termhashes[:,h] = (x->(a*x+b)%c).(terms)
+        termhashes[:,h] = (x->T((a*x+b)%c)).(terms)
     end
     nothing
 end
 
-function apply_term_weights!(termhashes::Array{Int,2}, dtm::SparseMatrixCSC{Int,Int})
+function apply_term_weights!(termhashes::Array{T,2}, dtm::SparseMatrixCSC{T,T}) where {T <: Integer}
     @info("applying term weights...")
     ndocs,nterms = size(dtm)
     twf = [log(1+ndocs/sum(dtm[:,t])) for t in 1:nterms]
     mw = minimum(twf)
-    termweights = [ceil(Int, w/mw) for w in twf]
+    termweights = [ceil(T, w/mw) for w in twf]
     termhashes .*= termweights
     nothing
 end
 
-function dochash!(dochashes::Array{Int,2}, termhashes::Array{Int,2}, dtm::SparseMatrixCSC{Int,Int})
+function dochash!(dochashes::Array{T,2}, termhashes::Array{T,2}, dtm::SparseMatrixCSC{T,T}) where {T <: Integer}
     @info("generating signatures...")
     ndocs,nhashes = size(dochashes)
 
@@ -75,13 +81,13 @@ function dochash!(dochashes::Array{Int,2}, termhashes::Array{Int,2}, dtm::Sparse
 end
 
 ### LSH
-similarity(sig1::Vector{Int}, sig2::Vector{Int}) = mean(.==(sig1, sig2))
-threshold(nbands::Int, nrows::Int) = (1/nbands) ^ (1/nrows)
+similarity(sig1::Vector{T}, sig2::Vector{T}) where {T <: Integer} = mean(.==(sig1, sig2))
+threshold(nbands::T, nrows::T) where {T <: Integer} = (1/nbands) ^ (1/nrows)
 
-function factors(n::Int)
-    allfactors = Int[]
+function factors(n::T) where {T <: Integer}
+    allfactors = T[]
 
-    for i in 1:n
+    for i in T(1):n
         if n % i == 0
             push!(allfactors, i)
         end
@@ -91,10 +97,10 @@ function factors(n::Int)
 end
 
 # nbands and nrows are across hash algorithms
-function best_partition(nhashes::Int, threslim::Float64)
+function best_partition(nhashes::T, threslim::Float64) where {T <: Integer}
     allfactors = factors(nhashes)
     mindiff = Inf
-    bestpart = (0,0)
+    bestpart = (T(0),T(0))
 
     for nbands in allfactors
         nrows = div(nhashes, nbands)
@@ -109,21 +115,21 @@ function best_partition(nhashes::Int, threslim::Float64)
     bestpart
 end
 
-function bandhash(model::LSHModel, threshold::Float64)
+function bandhash(model::LSHModel{T}, threshold::Float64) where {T <: Integer}
     get!(model.bandhash, threshold) do
         dochashes = model.dochashes
         ndocs,nhashes = size(dochashes)
-        nbands,nrows = best_partition(nhashes, threshold)
+        nbands,nrows = best_partition(T(nhashes), threshold)
 
-        ht = Dict{Vector{Int},Vector{Int}}()
+        ht = Dict{Vector{T},Vector{T}}()
 
-        for d in 1:ndocs
+        for d in T(1):ndocs
             dh = dochashes[d,:]
             for b in 1:nbands
                 brange = (1:nrows) .+ ((b-1)*nrows)
                 bsig = dh[brange]
                 bsigdocs = get!(ht, bsig) do
-                    Int[]
+                    T[]
                 end
                 append!(bsigdocs, d)
             end
@@ -132,9 +138,9 @@ function bandhash(model::LSHModel, threshold::Float64)
     end
 end
 
-match(model::LSHModel, sig::Array{Int,2}, threshold::Float64=DEFAULT_THRESHOLD) = [match(model, sig[d,:], threshold) for d in 1:size(sig,1)]
+match(model::LSHModel{T}, sig::Array{T,2}, threshold::Float64=DEFAULT_THRESHOLD) where {T <: Integer} = [match(model, sig[d,:], threshold) for d in 1:size(sig,1)]
 
-function match(model::LSHModel, sig::Vector{Int}, threshold::Float64=DEFAULT_THRESHOLD)
+function match(model::LSHModel{T}, sig::Vector{T}, threshold::Float64=DEFAULT_THRESHOLD) where {T <: Integer}
     nhashes = size(model.dochashes, 2)
     @assert(length(sig) == nhashes)
 
@@ -158,14 +164,14 @@ function match(model::LSHModel, sig::Vector{Int}, threshold::Float64=DEFAULT_THR
     sort!(result, by=x->x.similarity; rev=true)
 end
 
-function signature(model::LSHModel, tm::SparseVector{Int,Int})
+function signature(model::LSHModel{T}, tm::SparseVector{T,T}) where {T <: Integer}
     termhashes = model.termhashes
     nterms,nhashes = size(termhashes)
     nzinds = SparseArrays.nonzeroinds(tm)
     [minimum(termhashes[nzinds,h] .* tm[nzinds]) for h in 1:nhashes]
 end
 
-function signature(model::LSHModel, tm::SparseMatrixCSC{Int,Int})
+function signature(model::LSHModel{T}, tm::SparseMatrixCSC{T,T}) where {T <: Integer}
     nterms1,nhashes = size(model.termhashes)
     ndocs,nterms2 = size(tm)
     @assert(nterms1 == nterms2)
@@ -178,7 +184,7 @@ function signature(model::LSHModel, tm::SparseMatrixCSC{Int,Int})
     dochashes 
 end
 
-function selftest(model::LSHModel)
+function selftest(model::LSHModel{T}) where {T <: Integer}
     @info("running selftest...")
     ndocs,nhashes = size(model.dochashes)
     nfailures = 0
