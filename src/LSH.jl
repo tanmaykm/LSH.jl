@@ -168,14 +168,14 @@ function signature(model::LSHModel{T}, tm::SparseVector{T,T}) where {T <: Intege
     termhashes = model.termhashes
     nterms,nhashes = size(termhashes)
     nzinds = SparseArrays.nonzeroinds(tm)
-    [minimum(termhashes[nzinds,h] .* tm[nzinds]) for h in 1:nhashes]
+    T[minimum(termhashes[nzinds,h] .* tm[nzinds]) for h in 1:nhashes]
 end
 
 function signature(model::LSHModel{T}, tm::SparseMatrixCSC{T,T}) where {T <: Integer}
     nterms1,nhashes = size(model.termhashes)
     ndocs,nterms2 = size(tm)
     @assert(nterms1 == nterms2)
-    dochashes = Array{Int,2}(undef, ndocs, nhashes)
+    dochashes = Array{T,2}(undef, ndocs, nhashes)
 
     for d in 1:ndocs
         dochashes[d,:] = signature(model, tm[d,:])
