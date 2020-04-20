@@ -3,6 +3,7 @@ module LSH
 using Primes
 using SparseArrays
 using Statistics
+using Base.Threads
 
 import Base: match, show
 
@@ -69,7 +70,7 @@ function dochash!(dochashes::Array{T,2}, termhashes::Array{T,2}, dtm::SparseMatr
     @info("generating signatures...")
     ndocs,nhashes = size(dochashes)
 
-    for h in 1:nhashes
+    Threads.@threads for h in 1:nhashes
         th = termhashes[:,h]
         for d in 1:ndocs
             tm = dtm[d,:]
